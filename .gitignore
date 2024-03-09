@@ -38,3 +38,8 @@ captures
 !/playground/.gitkeep
 
 /identifier.sqlite
+
+/command-line-arguments
+
+.firebase
+.firebaserc

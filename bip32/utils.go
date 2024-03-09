@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"golang.org/x/crypto/ripemd160"
 	"io"
 	"math/big"
@@ -65,8 +65,8 @@ func publicKeyForPrivateKey(key []byte) []byte {
 }
 
 func addPublicKeys(key1 []byte, key2 []byte) []byte {
-	x1, y1 := expandPublicKey(key1)
-	x2, y2 := expandPublicKey(key2)
+	x1, y1 := ExpandPublicKey(key1)
+	x2, y2 := ExpandPublicKey(key2)
 	return compressPublicKey(curve.Add(x1, y1, x2, y2))
 }
 
@@ -104,7 +104,7 @@ func compressPublicKey(x *big.Int, y *big.Int) []byte {
 }
 
 // As described at https://crypto.stackexchange.com/a/8916
-func expandPublicKey(key []byte) (*big.Int, *big.Int) {
+func ExpandPublicKey(key []byte) (*big.Int, *big.Int) {
 	Y := big.NewInt(0)
 	X := big.NewInt(0)
 	X.SetBytes(key[1:])
@@ -130,7 +130,7 @@ func expandPublicKey(key []byte) (*big.Int, *big.Int) {
 }
 
 func validateChildPublicKey(key []byte) error {
-	x, y := expandPublicKey(key)
+	x, y := ExpandPublicKey(key)
 
 	if x.Sign() == 0 || y.Sign() == 0 {
 		return ErrInvalidPublicKey

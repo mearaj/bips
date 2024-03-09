@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: Unlicense OR MIT
-
 package main
+
+// SPDX-License-Identifier: Unlicense OR MIT
 
 import (
 	"image"

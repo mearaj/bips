@@ -6,13 +6,17 @@ import (
 	"gioui.org/font/gofont"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
+	"gioui.org/op/paint"
 	"gioui.org/text"
+	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 	"gioui.org/x/component"
 	"gioui.org/x/outlay"
 	"github.com/mearaj/bips/bip32"
 	"github.com/mearaj/bips/util"
+	"image"
 	"log"
 	"os"
 	"strconv"
@@ -55,13 +59,107 @@ func loop(w *app.Window) error {
 	var mnemonic string
 	var mnemonicPassPhrase string
 	var seed string
-	var keyPaths []util.KeyPath
-	var derivedResultsList layout.List
-	derivedResultsList.Axis = layout.Vertical
+	type KeyPathTab struct {
+		util.KeyPath
+		widget.Clickable
+	}
+	type KeyPathTabs struct {
+		layout.List
+		tabs     []KeyPathTab
+		selected int
+	}
+	var keyPathTabs KeyPathTabs
 	viewLayout := layout.List{Axis: layout.Vertical}
 	radioGroupMnemonicWords.Value = "12"
+	var tabsSlider Slider
 	// generateAddressesRange := uint32(20)
 	var consumedHeight int
+
+	var onKeyPathChange = func() {
+		str := "m"
+		if derivationPath.IsValid() {
+			str = derivationPath.String()
+		}
+		keyPaths, _ := bps.DeriveBIP32Result(util.Path(str))
+		keyPathTabs.tabs = make([]KeyPathTab, 0)
+		for _, keyPath := range keyPaths {
+			keyPathTabs.tabs = append(keyPathTabs.tabs,
+				KeyPathTab{
+					KeyPath: keyPath,
+				},
+			)
+		}
+		if keyPathTabs.selected >= len(keyPaths) {
+			keyPathTabs.selected = len(keyPaths) - 1
+		}
+	}
+	var onAutoCreateMnemonicClicked = func() {
+		val := radioGroupMnemonicWords.Value
+		wordsCount, _ := strconv.Atoi(val)
+		mnemonic, _ = util.GenerateMnemonic(byte(wordsCount))
+		mnemonicField.SetText(mnemonic)
+		seed, _ = util.DeriveSeedFromMnemonic(mnemonic, mnemonicPassPhrase)
+		bip39SeedField.SetText(seed)
+		rootKey, _ := util.RootKeyFromSeed(seed)
+		onKeyPathChange()
+		rootKey = bps.RootKey()
+		rootKeyStr = rootKey.String()
+		bip32RootKeyField.SetText(rootKeyStr)
+	}
+	var onMnemonicChange = func() {
+		mnemonic = mnemonicField.Text()
+		seed, _ = util.DeriveSeedFromMnemonic(mnemonic, mnemonicPassPhrase)
+		bip39SeedField.SetText(seed)
+		rootKey, _ := util.RootKeyFromSeed(seed)
+		bps.SetRootKey(*rootKey)
+		onKeyPathChange()
+		rootKey = bps.RootKey()
+		rootKeyStr = rootKey.String()
+		bip32RootKeyField.SetText(rootKeyStr)
+	}
+
+	var onMnemonicPassphraseChange = func() {
+		mnemonicPassPhrase = mnemonicPassphraseField.Text()
+		seed, _ = util.DeriveSeedFromMnemonic(mnemonic, mnemonicPassPhrase)
+		bip39SeedField.SetText(seed)
+		rootKey, _ := util.RootKeyFromSeed(seed)
+		bps.SetRootKey(*rootKey)
+		onKeyPathChange()
+		rootKey = bps.RootKey()
+		rootKeyStr = rootKey.String()
+		bip32RootKeyField.SetText(rootKeyStr)
+	}
+
+	var onSeedChange = func() {
+		seed = bip39SeedField.Text()
+		mnemonic = ""
+		mnemonicField.SetText(mnemonic)
+		rootKey, _ := util.RootKeyFromSeed(seed)
+		bps.SetRootKey(*rootKey)
+		onKeyPathChange()
+		rootKey = bps.RootKey()
+		rootKeyStr = rootKey.String()
+		bip32RootKeyField.SetText(rootKeyStr)
+	}
+
+	var onRootKeyStrChange = func() {
+		rootKeyStr = bip32RootKeyField.Text()
+		mnemonic = ""
+		mnemonicField.SetText(mnemonic)
+		seed = ""
+		bip39SeedField.SetText(seed)
+		rootKey, err := bip32.B58Deserialize(rootKeyStr)
+		if err == nil {
+			bps.SetRootKey(rootKey)
+			onKeyPathChange()
+			rootKey = *bps.RootKey()
+			rootKeyStr = rootKey.String()
+			bip32RootKeyField.SetText(rootKeyStr)
+		} else {
+			bps.SetRootKey(bip32.Key{})
+		}
+	}
+
 	for {
 		switch e := w.NextEvent().(type) {
 		case app.DestroyEvent:
@@ -71,97 +169,25 @@ func loop(w *app.Window) error {
 			inset := layout.UniformInset(32)
 			derivationPath = util.Path(derivationStr).Formatted()
 			if btnGenerateMnemonic.Clicked(gtx) {
-				val := radioGroupMnemonicWords.Value
-				wordsCount, _ := strconv.Atoi(val)
-				mnemonic, _ = util.GenerateMnemonic(byte(wordsCount))
-				mnemonicField.SetText(mnemonic)
-				seed, _ = util.DeriveSeedFromMnemonic(mnemonic, mnemonicPassPhrase)
-				bip39SeedField.SetText(seed)
-				rootKey, _ := util.RootKeyFromSeed(seed)
-				str := "m"
-				if derivationPath.IsValid() {
-					str = derivationPath.String()
-				}
-				keyPaths, _ = bps.DeriveBIP32Result(util.Path(str))
-				rootKey = bps.RootKey()
-				rootKeyStr = rootKey.String()
-				bip32RootKeyField.SetText(rootKeyStr)
+				onAutoCreateMnemonicClicked()
 			}
 			if mnemonicField.Text() != mnemonic {
-				mnemonic = mnemonicField.Text()
-				seed, _ = util.DeriveSeedFromMnemonic(mnemonic, mnemonicPassPhrase)
-				bip39SeedField.SetText(seed)
-				rootKey, _ := util.RootKeyFromSeed(seed)
-				bps.SetRootKey(*rootKey)
-				str := "m"
-				if derivationPath.IsValid() {
-					str = derivationPath.String()
-				}
-				keyPaths, _ = bps.DeriveBIP32Result(util.Path(str))
-				rootKey = bps.RootKey()
-				rootKeyStr = rootKey.String()
-				bip32RootKeyField.SetText(rootKeyStr)
+				onMnemonicChange()
 			}
 			if mnemonicPassphraseField.Text() != mnemonicPassPhrase {
-				mnemonicPassPhrase = mnemonicPassphraseField.Text()
-				seed, _ = util.DeriveSeedFromMnemonic(mnemonic, mnemonicPassPhrase)
-				bip39SeedField.SetText(seed)
-				rootKey, _ := util.RootKeyFromSeed(seed)
-				bps.SetRootKey(*rootKey)
-				str := "m"
-				if derivationPath.IsValid() {
-					str = derivationPath.String()
-				}
-				keyPaths, _ = bps.DeriveBIP32Result(util.Path(str))
-				rootKey = bps.RootKey()
-				rootKeyStr = rootKey.String()
-				bip32RootKeyField.SetText(rootKeyStr)
+				onMnemonicPassphraseChange()
 			}
 			if bip39SeedField.Text() != seed {
-				seed = bip39SeedField.Text()
-				mnemonic = ""
-				mnemonicField.SetText(mnemonic)
-				rootKey, _ := util.RootKeyFromSeed(seed)
-				bps.SetRootKey(*rootKey)
-				str := "m"
-				if derivationPath.IsValid() {
-					str = derivationPath.String()
-				}
-				keyPaths, _ = bps.DeriveBIP32Result(util.Path(str))
-				rootKey = bps.RootKey()
-				rootKeyStr = rootKey.String()
-				bip32RootKeyField.SetText(rootKeyStr)
+				onSeedChange()
 			}
 			if rootKeyStr != bip32RootKeyField.Text() {
-				rootKeyStr = bip32RootKeyField.Text()
-				mnemonic = ""
-				mnemonicField.SetText(mnemonic)
-				seed = ""
-				bip39SeedField.SetText(seed)
-				rootKey, err := bip32.B58Deserialize(rootKeyStr)
-				if err == nil {
-					bps.SetRootKey(rootKey)
-					str := "m"
-					if derivationPath.IsValid() {
-						str = derivationPath.String()
-					}
-					keyPaths, _ = bps.DeriveBIP32Result(util.Path(str))
-					rootKey = *bps.RootKey()
-					rootKeyStr = rootKey.String()
-					bip32RootKeyField.SetText(rootKeyStr)
-				} else {
-					bps.SetRootKey(bip32.Key{})
-				}
+				onRootKeyStrChange()
 			}
 			if util.Path(derivationField.Text()).String() !=
 				util.Path(derivationStr).String() {
 				derivationStr = derivationField.Text()
 				derivationPath = util.Path(derivationStr).Formatted()
-				str := "m"
-				if derivationPath.IsValid() {
-					str = derivationPath.String()
-				}
-				keyPaths, _ = bps.DeriveBIP32Result(util.Path(str))
+				onKeyPathChange()
 				rootKey := *bps.RootKey()
 				rootKeyStr = rootKey.String()
 				bip32RootKeyField.SetText(rootKeyStr)
@@ -259,7 +285,7 @@ func loop(w *app.Window) error {
 									}),
 									layout.Rigid(layout.Spacer{Height: 2}.Layout),
 									layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-										txt := material.Label(th, 16, "Ex m/44'/60' (Bip44 for Ethereum Coin)")
+										txt := material.Label(th, 16, "Ex m/44'/60'/0'/0/0 (Bip44 for Ethereum Coin(60'))")
 										txt.Alignment = text.Middle
 										return txt.Layout(gtx)
 									}),
@@ -278,28 +304,65 @@ func loop(w *app.Window) error {
 							})
 						}),
 						Rigid(layout.Spacer{Height: 32}.Layout),
+						layout.Rigid(func(gtx Gtx) Dim {
+							return keyPathTabs.List.Layout(gtx, len(keyPathTabs.tabs), func(gtx Gtx, tabIdx int) Dim {
+								t := &keyPathTabs.tabs[tabIdx]
+								if t.Clicked(gtx) {
+									if keyPathTabs.selected < tabIdx {
+										tabsSlider.PushLeft()
+									} else if keyPathTabs.selected > tabIdx {
+										tabsSlider.PushRight()
+									}
+									keyPathTabs.selected = tabIdx
+								}
+								var tabWidth int
+								return layout.Stack{Alignment: layout.S}.Layout(gtx,
+									layout.Stacked(func(gtx Gtx) Dim {
+										dims := material.Clickable(gtx, &t.Clickable, func(gtx Gtx) Dim {
+											return layout.UniformInset(unit.Dp(12)).Layout(gtx,
+												material.H6(th, t.KeyPath.Path.String()).Layout,
+											)
+										})
+										tabWidth = dims.Size.X
+										return dims
+									}),
+									layout.Stacked(func(gtx Gtx) Dim {
+										if keyPathTabs.selected != tabIdx {
+											return layout.Dimensions{}
+										}
+										tabHeight := gtx.Dp(unit.Dp(4))
+										tabRect := image.Rect(0, 0, tabWidth, tabHeight)
+										paint.FillShape(gtx.Ops, th.Palette.ContrastBg, clip.Rect(tabRect).Op())
+										return layout.Dimensions{
+											Size: image.Point{X: tabWidth, Y: tabHeight},
+										}
+									}),
+								)
+							})
+						}),
 						Rigid(func(gtx layout.Context) layout.Dimensions {
-							return derivedResultsList.Layout(gtx, len(keyPaths), func(gtx layout.Context, index int) layout.Dimensions {
-								keyPath := &keyPaths[index]
+							if keyPathTabs.selected >= len(keyPathTabs.tabs) {
+								return layout.Dimensions{}
+							}
+							return tabsSlider.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+								if len(keyPathTabs.tabs) == 0 {
+									return layout.Dimensions{}
+								}
+								if keyPathTabs.selected < 0 {
+									return layout.Dimensions{}
+								}
+								keyPath := keyPathTabs.tabs[keyPathTabs.selected]
 								flex := layout.Flex{Axis: layout.Vertical}
 								return flex.Layout(gtx,
 									layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 										return material.Label(th, 16, keyPath.Path.String()).Layout(gtx)
 									}),
 									layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-										insets := layout.Inset{Left: 16}
-										return insets.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-											flex := layout.Flex{Axis: layout.Vertical}
-											return flex.Layout(gtx,
-												layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-													return material.Label(th, 16, keyPath.Key.String()).Layout(gtx)
-												}),
-												layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-													publicKeyExtended := keyPath.Key.PublicKeyExtended()
-													return material.Label(th, 16, publicKeyExtended.String()).Layout(gtx)
-												}),
-											)
-										})
+										return material.Label(th, 16, keyPath.Key.String()).Layout(gtx)
+									}),
+									layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+										publicKeyExtended := keyPath.Key.PublicKeyExtended()
+										return material.Label(th, 16, publicKeyExtended.String()).Layout(gtx)
 									}),
 								)
 							})

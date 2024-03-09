@@ -4,9 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/btcsuite/btcutil/base58"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/mearaj/bips/bip32"
 	"github.com/mearaj/bips/bip39"
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -194,12 +194,10 @@ func (b KeyPath) AddrHex() string {
 	if err != nil {
 		return ""
 	}
-	deCompKey, err := crypto.DecompressPubkey(pbs)
-	if err != nil {
-		return ""
-	}
-	addrBs := append(deCompKey.X.Bytes(), deCompKey.Y.Bytes()...)
-	return hex.EncodeToString(crypto.Keccak256(addrBs)[12:])
+	x, y := bip32.ExpandPublicKey(pbs)
+	addrBs := append(x.Bytes(), y.Bytes()...)
+	kckHash := sha3.NewLegacyKeccak256()
+	return hex.EncodeToString(kckHash.Sum((addrBs)[12:]))
 }
 
 func (b KeyPath) PvtKeyInWIF(compress bool, netPrefix byte) string {

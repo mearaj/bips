@@ -2,9 +2,9 @@ package bip44
 
 import (
 	"embed"
-	"github.com/ethereum/go-ethereum/common/math"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -38,12 +38,12 @@ func generateFileFromSlip44MD() {
 			!strings.Contains(fields[len(fields)-1], "dead")
 		if canParse {
 			var regCoin Coin
-			coinType, ok := math.ParseUint64(fields[0])
-			if ok {
+			coinType, err := strconv.ParseUint(fields[0], 10, 32)
+			if err == nil {
 				regCoin.Type = uint32(coinType)
-				pathComp, ok := math.ParseUint64(fields[1])
+				pathComp, err := strconv.ParseUint(fields[1], 10, 32)
 				regCoin.PathComponent = uint32(pathComp)
-				if ok {
+				if err == nil {
 					if len(fields) == 3 {
 						regCoin.Name = fields[2]
 					} else {
