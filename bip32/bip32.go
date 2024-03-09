@@ -166,7 +166,7 @@ func (key *Key) NewChildKey(childIdx uint32) (Key, error) {
 		}
 		copy(childKey[FingerPrintStartIndex:FingerPrintEndIndex], fingerprint)
 		kbs := addPublicKeys(keyBytes, key[PubKeyStartIndex:])
-		childKey.setKeyBytes(KeyBytes(kbs))
+		childKey.setPubKeyBytes(KeyBytes(kbs))
 	}
 	return childKey, nil
 }
@@ -360,7 +360,7 @@ func (key *Key) GetPvtKeyBytes() PvtKeyBytes {
 	return PvtKeyBytes(key[PvtKeyStartIndex:PubKeyEndIndex])
 }
 
-func (key *Key) setKeyBytes(b KeyBytes) {
+func (key *Key) setPubKeyBytes(b KeyBytes) {
 	copy(key[PubKeyStartIndex:PubKeyEndIndex], b[:])
 }
 

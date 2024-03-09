@@ -79,18 +79,16 @@ func RootKeyFromSeed(seed string) (*bip32.Key, error) {
 
 type Path = bip32.Path
 
-//type BIP32Result struct {
-//	KeyVersions []KeyVersion
-//}
-
-//type KeyVersion struct {
-//	Key  bip32.Key
-//	Path Path
-//}
-
 type KeyPath struct {
 	Path Path
 	bip32.Key
+}
+
+type KeyPathRange struct {
+	StartIndex uint32
+	EndIndex   uint32
+	KeyPath
+	KeyPaths []KeyPath
 }
 
 type Generator struct {
@@ -119,7 +117,6 @@ func (g *Generator) DeriveBIP32Result(p bip32.Path) ([]KeyPath, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	derivedPath := "m"
 	keyPath := KeyPath{
 		Path: Path(derivedPath),
@@ -127,24 +124,6 @@ func (g *Generator) DeriveBIP32Result(p bip32.Path) ([]KeyPath, error) {
 	}
 	keyPaths := make([]KeyPath, 1)
 	keyPaths[0] = keyPath
-
-	// versionFlag := rootKey.GetVersion()
-	//versionBytes, ok := bip32.PvtFlagToHDBytesSlice[versionFlag]
-	//if !ok || len(versionBytes) == 0 {
-	//	return nil, bip32.ErrUnSupportedHDVersionBytes
-	//}
-	//var results = make([]BIP32Result, 1)
-	//for _, vbs := range versionBytes {
-	//	mKey := *rootKey
-	//	mKey.SetVersionUint32(vbs.PvtKeyFlag)
-	//	res := KeyVersion{
-	//		Key:          mKey,
-	//		VersionBytes: vbs,
-	//		Path:         Path(derivedPath),
-	//	}
-	//	results[0].KeyVersions = append(results[0].KeyVersions, res)
-	//}
-
 	currentKey := *rootKey
 	for _, val := range pathItems {
 		derivedPath = fmt.Sprintf("%s/%d", derivedPath, val%bip32.FirstHardenedChild)
@@ -156,54 +135,40 @@ func (g *Generator) DeriveBIP32Result(p bip32.Path) ([]KeyPath, error) {
 			Path: Path(derivedPath).Formatted(),
 			Key:  currentKey,
 		})
-		//if ind == 0 && val >= bip32.FirstHardenedChild {
-		//	versionBytes, _ = bip32.PurposeToHDBytesSlice[val%bip32.FirstHardenedChild]
-		//}
-		//if ind == 1 && val >= bip32.FirstHardenedChild && len(versionBytes) > 0 {
-		//	// If it's BIP44 std, then it should be found
-		//	var isBIP44 = pathItems[0]%bip32.FirstHardenedChild == 44
-		//	if isBIP44 {
-		//		_, ok := bip44.RegBip44CoinsTypeToValMap[val%bip32.FirstHardenedChild]
-		//		if !ok {
-		//			return results, ErrUnsupportedCoinType
-		//		}
-		//	}
-		//	var levelTwoVersionBytes []bip32.VersionBytes
-		//	for _, hdBytes := range versionBytes {
-		//		coinValFull, _ := hdBytes.CoinValFull()
-		//		if val == coinValFull {
-		//			levelTwoVersionBytes = append(levelTwoVersionBytes, hdBytes)
-		//		}
-		//	}
-		//	versionBytes = levelTwoVersionBytes[:]
-		//	if len(versionBytes) == 0 {
-		//		if val%bip32.FirstHardenedChild != 1 {
-		//			versionBytes = []bip32.VersionBytes{bip32.DefaultMainnetVersion}
-		//		} else {
-		//			versionBytes = []bip32.VersionBytes{bip32.DefaultTestnetVersion}
-		//		}
-		//	}
-		//}
-		//result := BIP32Result{
-		//	KeyVersions: make([]KeyVersion, 0),
-		//}
-		//results = append(results, result)
-		//currentKey, _ = currentKey.NewChildKey(val)
-		//for _, vbs := range versionBytes {
-		//	currentKey := currentKey
-		//	currentKey.SetVersionUint32(vbs.PvtKeyFlag)
-		//	if !currentKey.IsPrivate() {
-		//		currentKey.SetVersionUint32(vbs.PubKeyFlag)
-		//	}
-		//	res := KeyVersion{
-		//		Key:          currentKey,
-		//		VersionBytes: vbs,
-		//		Path:         Path(derivedPath),
-		//	}
-		//	results[len(results)-1].KeyVersions = append(results[len(results)-1].KeyVersions, res)
-		//}
 	}
 	return keyPaths, nil
+}
+
+func (b *KeyPathRange) GenerateRange() error {
+	startIndex := b.StartIndex
+	endIndex := b.EndIndex
+
+	if endIndex-startIndex < 1 {
+		return ErrInvalidRangeProvided
+	}
+	if !b.Key.IsValid() {
+		return ErrInvalidRootKey
+	}
+	if !b.Path.IsValid() {
+		return ErrUnSupportedOrInvalidPath
+	}
+
+	currentKey := b.Key
+	derivedPath := b.Path.String()
+	keyPaths := make([]KeyPath, 0)
+	for i := startIndex; i < endIndex; i++ {
+		derivedPath = fmt.Sprintf("%s/%d", derivedPath, i%bip32.FirstHardenedChild)
+		if i >= bip32.FirstHardenedChild {
+			derivedPath += "'"
+		}
+		currentKey, _ = currentKey.NewChildKey(i)
+		keyPaths = append(keyPaths, KeyPath{
+			Path: Path(derivedPath).Formatted(),
+			Key:  currentKey,
+		})
+	}
+	b.KeyPaths = keyPaths
+	return nil
 }
 
 func (b KeyPath) AddrP2SH(verPrefix byte) string {
