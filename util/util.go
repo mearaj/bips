@@ -3,10 +3,8 @@ package util
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/btcsuite/btcutil/base58"
 	"github.com/mearaj/bips/bip32"
 	"github.com/mearaj/bips/bip39"
-	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -19,7 +17,6 @@ const (
 
 // GenerateMnemonic
 // https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki#user-content-Wordlists
-
 func GenerateMnemonic(wordsCount byte) (string, error) {
 	var bitSize int
 	switch wordsCount {
@@ -78,11 +75,6 @@ func RootKeyFromSeed(seed string) (*bip32.Key, error) {
 }
 
 type Path = bip32.Path
-
-type KeyPath struct {
-	Path Path
-	bip32.Key
-}
 
 type KeyPathRange struct {
 	StartIndex uint32
@@ -169,58 +161,6 @@ func (b *KeyPathRange) GenerateRange() error {
 	}
 	b.KeyPaths = keyPaths
 	return nil
-}
-
-func (b KeyPath) AddrP2SH(verPrefix byte) string {
-	pbs, err := hex.DecodeString(b.Key.PublicKeyHex())
-	if err != nil {
-		return ""
-	}
-	pubKeyHash, err := bip32.HashDblRipeMD160onSha256(pbs)
-	if err != nil {
-		return ""
-	}
-	verPubKeyHash := append([]byte{verPrefix}, pubKeyHash...)
-	chkSum, err := bip32.ChecksumDblSha256(verPubKeyHash)
-	if err != nil {
-		return ""
-	}
-	addBs := append(verPubKeyHash, chkSum...)
-	return base58.Encode(addBs)
-}
-
-func (b KeyPath) AddrHex() string {
-	pbs, err := hex.DecodeString(b.Key.PublicKeyHex())
-	if err != nil {
-		return ""
-	}
-	x, y := bip32.ExpandPublicKey(pbs)
-	addrBs := append(x.Bytes(), y.Bytes()...)
-	kckHash := sha3.NewLegacyKeccak256()
-	return hex.EncodeToString(kckHash.Sum((addrBs)[12:]))
-}
-
-func (b KeyPath) PvtKeyInWIF(compress bool, netPrefix byte) string {
-	hexToConvert := fmt.Sprintf("%x%s", netPrefix, b.Key.PrivateKeyHex())
-	if compress {
-		hexToConvert += "01"
-	}
-	pvtKeyBs, err := hex.DecodeString(hexToConvert)
-	if err != nil {
-		return ""
-	}
-	pvtKeyDblChkSum, err := bip32.ChecksumDblSha256(pvtKeyBs)
-	if err != nil {
-		return ""
-	}
-	pvtKeyDblChkSumHex := hex.EncodeToString(pvtKeyDblChkSum)
-	pvtKeyHex := hexToConvert + pvtKeyDblChkSumHex
-	pvtKeyHexBs, err := hex.DecodeString(pvtKeyHex)
-	if err != nil {
-		return ""
-	}
-	pvtKey58 := base58.Encode(pvtKeyHexBs)
-	return pvtKey58
 }
 
 //AddressesKey difference between startIndex and endIndex range should

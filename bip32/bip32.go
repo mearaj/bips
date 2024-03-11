@@ -136,7 +136,7 @@ func (key *Key) NewChildKey(childIdx uint32) (Key, error) {
 	childKey.SetVersion(vs)
 	// Bip32 CKDpriv
 	if key.IsPrivate() {
-		fingerprint, err := HashDblRipeMD160onSha256(
+		fingerprint, err := HashRipeMD160onSha256(
 			publicKeyForPrivateKey(key[PvtKeyStartIndex:PubKeyEndIndex]),
 		)
 		if err != nil {
@@ -160,7 +160,7 @@ func (key *Key) NewChildKey(childIdx uint32) (Key, error) {
 		if err != nil {
 			return childKey, err
 		}
-		fingerprint, err := HashDblRipeMD160onSha256(key[PubKeyStartIndex:])
+		fingerprint, err := HashRipeMD160onSha256(key[PubKeyStartIndex:])
 		if err != nil {
 			return childKey, err
 		}

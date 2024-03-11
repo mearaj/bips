@@ -27,8 +27,8 @@ func hashRipeMD160(data []byte) ([]byte, error) {
 	return hsr.Sum(nil), nil
 }
 
-// HashDblRipeMD160onSha256 hashRipeMD160(sha256.Sum256(data))
-func HashDblRipeMD160onSha256(data []byte) ([]byte, error) {
+// HashRipeMD160onSha256 hashRipeMD160(sha256.Sum256(data))
+func HashRipeMD160onSha256(data []byte) ([]byte, error) {
 	hash1 := sha256.Sum256(data)
 	hash2, err := hashRipeMD160(hash1[:])
 	if err != nil {

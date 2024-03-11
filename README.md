@@ -4,6 +4,9 @@ Derivation of keys from path and mnemonic or seed or master key using bips stand
 ### Website
 https://bips-4a2fc.web.app/
 
+### Wasm
+gogio -o output/wasm -target js .../cmd/ui
+
 ### Resources
 <pre>
 BIP-32 m/purpose'/coin_type'/account'/change/address_index
