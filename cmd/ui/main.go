@@ -13,7 +13,10 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 	"gioui.org/x/component"
+	"gioui.org/x/markdown"
 	"gioui.org/x/outlay"
+	"gioui.org/x/richtext"
+	"github.com/mearaj/bips"
 	"github.com/mearaj/bips/bip32"
 	"github.com/mearaj/bips/util"
 	"image"
@@ -69,6 +72,9 @@ var seed string
 
 var viewLayout = layout.List{Axis: layout.Vertical}
 var tabsSlider Slider
+
+var markdownRd = markdown.NewRenderer()
+var richTextState richtext.InteractiveText
 
 var onKeyPathChange = func() {
 	str := "m"
@@ -367,6 +373,13 @@ func loop(w *app.Window) error {
 									}),
 								)
 							})
+						}),
+						Rigid(func(gtx layout.Context) layout.Dimensions {
+							ly, err := markdownRd.Render(bips.ReadMeMarkdown)
+							if err != nil {
+								return material.Label(th, 16, err.Error()).Layout(gtx)
+							}
+							return richtext.Text(&richTextState, th.Shaper, ly...).Layout(gtx)
 						}),
 					)
 				})
