@@ -2,6 +2,7 @@ package bip32
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -86,4 +87,21 @@ func (p Path) ValueAtDepth(b byte) (uint32, error) {
 		return 0, ErrUnSupportedOrInvalidPath
 	}
 	return vals[b], nil
+}
+func (p Path) ReplaceValueAtDepth(b byte, val uint32) (Path, error) {
+	newPath := p
+	vals, err := newPath.ValuesAtDepth()
+	if err != nil {
+		return newPath, err
+	}
+	if !(b < byte(len(vals))) {
+		return newPath, ErrUnSupportedOrInvalidPath
+	}
+	valsArr := strings.Split(newPath.String(), "/")
+	if val >= FirstHardenedChild {
+		valsArr[b] = fmt.Sprintf("%d'", val%FirstHardenedChild)
+	} else {
+		valsArr[b] = fmt.Sprintf("%d", val)
+	}
+	return Path(strings.Join(valsArr, "/")), nil
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"gioui.org/app"
 	"gioui.org/font/gofont"
 	"gioui.org/layout"
@@ -16,14 +15,13 @@ import (
 	"gioui.org/x/component"
 	"gioui.org/x/outlay"
 	"github.com/mearaj/bips/bip32"
-	"github.com/mearaj/bips/bip44"
 	"github.com/mearaj/bips/util"
+	"golang.org/x/exp/shiny/materialdesign/icons"
 	"image"
+	"image/color"
 	"log"
 	"os"
-	"sort"
 	"strconv"
-	"strings"
 )
 
 func main() {
@@ -59,8 +57,6 @@ var Rigid = layout.Rigid
 var bps = util.Generator{}
 var btnGenerateMnemonic widget.Clickable
 var radioGroupMnemonicWords widget.Enum
-var radioGroupSupportedStd widget.Enum
-var radioGroupBip44Coins widget.Enum
 var mnemonicField component.TextField
 var mnemonicPassphraseField component.TextField
 var bip39SeedField component.TextField
@@ -72,9 +68,8 @@ var rootKeyStr string
 var mnemonic string
 var mnemonicPassPhrase string
 var seed string
-var filteredCoins = bip44.RegCoins[:]
-var coinKeyField component.TextField
-
+var outputLeftBtn widget.Clickable
+var outputRightBtn widget.Clickable
 var viewLayout = layout.List{Axis: layout.Vertical}
 var tabsSlider Slider
 
@@ -168,28 +163,6 @@ var OnDerivationPathChange = func() {
 	rootKeyStr = rootKey.String()
 	bip32RootKeyField.SetText(rootKeyStr)
 	// Set the appropriate BIP std (purpose component)
-	purVal, err := derivationPath.ValueAtDepth(1)
-	if err == nil {
-		valStr := fmt.Sprintf("%d", purVal)
-		if radioGroupSupportedStd.Value != valStr {
-			radioGroupSupportedStd.Value = valStr
-		}
-		// Set the appropriate coin value if BIP44 std (purpose)
-		if purVal == 44+bip32.FirstHardenedChild {
-			coinVal, err := derivationPath.ValueAtDepth(2)
-			if err == nil {
-				valStr := fmt.Sprintf("%d", coinVal)
-				if radioGroupBip44Coins.Value != valStr {
-					radioGroupBip44Coins.Value = valStr
-				}
-				coin, ok := bip44.RegBip44CoinsPathCompToValMap[coinVal]
-				if ok {
-					coinKeyField.SetText(coin.String())
-				}
-			}
-		}
-	}
-
 }
 
 func loop(w *app.Window) error {
@@ -197,20 +170,6 @@ func loop(w *app.Window) error {
 	th.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
 	var ops op.Ops
 	radioGroupMnemonicWords.Value = "12"
-	//for key := range bip32.PurposeToHDBytesSlice {
-	//	supportedStandards = append(supportedStandards, key)
-	//}
-	purposeFullSlice := make([]uint32, len(bip32.PurposeToHDBytesSlice))
-	i := 0
-	for pur, _ := range bip32.PurposeFullToHDBytesSlice {
-		purposeFullSlice[i] = pur
-		i++
-	}
-	sort.Slice(purposeFullSlice, func(i, j int) bool {
-		return purposeFullSlice[i] < purposeFullSlice[j]
-	})
-	var coinsList = layout.List{Axis: layout.Vertical}
-	var coinKeyFilter string
 	for {
 		switch e := w.NextEvent().(type) {
 		case app.DestroyEvent:
@@ -218,22 +177,6 @@ func loop(w *app.Window) error {
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 			inset := layout.UniformInset(32)
-			if coinKeyFilter != coinKeyField.Text() {
-				coinKeyFilter = strings.TrimSpace(coinKeyField.Text())
-				filteredCoins = make([]bip44.Coin, 0)
-				for _, c := range bip44.RegCoins {
-					name := strings.ToLower(c.Name)
-					symbol := strings.ToLower(c.Symbol)
-					tp := strings.ToLower(fmt.Sprintf("%d", c.Type))
-					filter := strings.ToLower(coinKeyFilter)
-					if strings.HasPrefix(name, filter) ||
-						strings.HasPrefix(symbol, filter) ||
-						strings.Contains(tp, filter) {
-						filteredCoins = append(filteredCoins, c)
-					}
-				}
-				gtx.Execute(op.InvalidateCmd{})
-			}
 			derivationPath = util.Path(derivationStr).Formatted()
 			if btnGenerateMnemonic.Clicked(gtx) {
 				onAutoCreateMnemonicClicked()
@@ -325,13 +268,13 @@ func loop(w *app.Window) error {
 							return layout.Center.Layout(gtx, func(gtx Gtx) Dim {
 								flex := layout.Flex{Alignment: layout.Middle, Axis: layout.Vertical}
 								return flex.Layout(gtx,
-									Rigid(func(gtx Gtx) layout.Dimensions {
+									Rigid(func(gtx Gtx) Dim {
 										txt := material.H5(th, "Enter Derivation Path")
 										txt.Alignment = text.Middle
 										return txt.Layout(gtx)
 									}),
 									Rigid(layout.Spacer{Height: 2}.Layout),
-									Rigid(func(gtx Gtx) layout.Dimensions {
+									Rigid(func(gtx Gtx) Dim {
 										txt := material.Label(th, 16, "Ex m/44'/60'/0'/0/0 (Bip44 for Ethereum Coin(60'))")
 										txt.Alignment = text.Middle
 										return txt.Layout(gtx)
@@ -343,128 +286,6 @@ func loop(w *app.Window) error {
 							hintText := "Ex m/44'/60'"
 							return derivationField.Layout(gtx, th, hintText)
 						}),
-						layout.Rigid(layout.Spacer{Height: 16}.Layout),
-						Rigid(func(gtx Gtx) Dim {
-							flowWrap := outlay.FlowWrap{}
-							pathArr := strings.Split(derivationPath.String(), "/")
-							//var derivationPathChanged bool
-							// If changed due to bip standards radio click
-							if len(pathArr) > 1 {
-								val, err := derivationPath.ValueAtDepth(1)
-								if err == nil {
-									radioVal := radioGroupSupportedStd.Value
-									radioValInt, err := strconv.Atoi(radioVal)
-									if err == nil {
-										radiValUint32 := uint32(radioValInt)
-										valStr := fmt.Sprintf("%d", val)
-										if valStr != radioVal {
-											pathArr[1] = fmt.Sprintf("%d'", radiValUint32%bip32.FirstHardenedChild)
-											derivationStr = strings.Join(pathArr, "/")
-											derivationField.SetText(derivationStr)
-											derivationField.Update(gtx, th, derivationStr)
-											OnDerivationPathChange()
-										}
-									}
-								}
-							} else if len(pathArr) == 1 {
-								radioVal := radioGroupSupportedStd.Value
-								radioValInt, err := strconv.Atoi(radioVal)
-								if err == nil {
-									radiValUint32 := uint32(radioValInt)
-									_, ok := bip32.PurposeFullToHDBytesSlice[radiValUint32]
-									if ok {
-										pathArr = append(pathArr, "")
-										if pathArr[0] == "" {
-											pathArr[0] = "m"
-										}
-										pathArr[1] = fmt.Sprintf("%d'", radiValUint32%bip32.FirstHardenedChild)
-										derivationStr = strings.Join(pathArr, "/")
-										derivationField.SetText(derivationStr)
-										derivationField.Update(gtx, th, derivationStr)
-										OnDerivationPathChange()
-									}
-								}
-							}
-							return flowWrap.Layout(gtx, len(bip32.PurposeFullToHDBytesSlice), func(gtx Gtx, i int) Dim {
-								var val, lbl string
-								val = fmt.Sprintf("%d", purposeFullSlice[i])
-								valStr := fmt.Sprintf("%d", purposeFullSlice[i]%bip32.FirstHardenedChild)
-								lbl = "BIP" + valStr
-								inset := layout.Inset{Right: 16}
-								return inset.Layout(gtx, func(gtx Gtx) Dim {
-									return material.RadioButton(th,
-										&radioGroupSupportedStd, val, lbl).Layout(gtx)
-								})
-							})
-						}),
-						layout.Rigid(layout.Spacer{Height: 8}.Layout),
-						Rigid(func(gtx layout.Context) layout.Dimensions {
-							pathArr := strings.Split(derivationPath.String(), "/")
-							if len(pathArr) > 1 && radioGroupSupportedStd.Value == fmt.Sprintf("%d", 44+bip32.FirstHardenedChild) {
-								return coinKeyField.Layout(gtx, th, "Select Coin")
-							}
-							return Dim{}
-						}),
-						Rigid(func(gtx Gtx) Dim {
-							pathArr := strings.Split(derivationPath.String(), "/")
-							// If supports BIP44
-							if len(pathArr) > 1 && radioGroupSupportedStd.Value == fmt.Sprintf("%d", 44+bip32.FirstHardenedChild) {
-								if len(pathArr) > 2 {
-									val, err := derivationPath.ValueAtDepth(2)
-									if err == nil {
-										radioVal := radioGroupBip44Coins.Value
-										radioValInt, err := strconv.Atoi(radioVal)
-										if err == nil {
-											radiValUint32 := uint32(radioValInt)
-											valStr := fmt.Sprintf("%d", val)
-											if valStr != radioVal {
-												pathArr[2] = fmt.Sprintf("%d'", radiValUint32%bip32.FirstHardenedChild)
-												derivationStr = strings.Join(pathArr, "/")
-												derivationField.SetText(derivationStr)
-												derivationField.Update(gtx, th, derivationStr)
-												coin, ok := bip44.RegBip44CoinsPathCompToValMap[radiValUint32]
-												if ok {
-													coinKeyField.SetText(coin.String())
-												}
-												OnDerivationPathChange()
-											}
-										}
-									}
-								} else {
-									radioVal := radioGroupBip44Coins.Value
-									radioValInt, err := strconv.Atoi(radioVal)
-									if err == nil {
-										radiValUint32 := uint32(radioValInt)
-										_, ok := bip44.RegBip44CoinsPathCompToValMap[radiValUint32]
-										if ok {
-											pathArr = append(pathArr, "")
-											if pathArr[0] == "" {
-												pathArr[0] = "m"
-											}
-											pathArr[2] = fmt.Sprintf("%d'", radiValUint32%bip32.FirstHardenedChild)
-											derivationStr = strings.Join(pathArr, "/")
-											derivationField.SetText(derivationStr)
-											derivationField.Update(gtx, th, derivationStr)
-											OnDerivationPathChange()
-										}
-									}
-								}
-							}
-							gtx.Constraints.Max.Y = gtx.Dp(300)
-							// If supports BIP44
-							if len(pathArr) > 1 && radioGroupSupportedStd.Value == fmt.Sprintf("%d", 44+bip32.FirstHardenedChild) {
-								return coinsList.Layout(gtx, len(filteredCoins), func(gtx Gtx, i int) Dim {
-									val := fmt.Sprintf("%d", filteredCoins[i].PathComponent)
-									lbl := fmt.Sprintf("%s", filteredCoins[i].String())
-									inset := layout.Inset{Right: 16}
-									return inset.Layout(gtx, func(gtx Gtx) Dim {
-										return material.RadioButton(th,
-											&radioGroupBip44Coins, val, lbl).Layout(gtx)
-									})
-								})
-							}
-							return Dim{}
-						}),
 						Rigid(layout.Spacer{Height: 32}.Layout),
 						Rigid(func(gtx Gtx) Dim {
 							gtx.Constraints.Min.X = gtx.Constraints.Max.X
@@ -474,71 +295,108 @@ func loop(w *app.Window) error {
 						}),
 						Rigid(layout.Spacer{Height: 32}.Layout),
 						Rigid(func(gtx Gtx) Dim {
-							return keyPathTabs.List.Layout(gtx, len(keyPathTabs.tabs), func(gtx Gtx, tabIdx int) Dim {
-								t := &keyPathTabs.tabs[tabIdx]
-								if t.Clicked(gtx) {
-									if keyPathTabs.selected < tabIdx {
-										tabsSlider.PushLeft()
-									} else if keyPathTabs.selected > tabIdx {
-										tabsSlider.PushRight()
+							if len(keyPathTabs.tabs) == 0 {
+								return Dim{}
+							}
+							flex := Flex{Spacing: layout.SpaceBetween, Alignment: layout.Middle}
+							gtx.Constraints.Min.X = gtx.Constraints.Max.X
+							return flex.Layout(gtx,
+								Rigid(func(gtx Gtx) Dim {
+									if outputLeftBtn.Clicked(gtx) {
+										if keyPathTabs.selected > 0 {
+											tabsSlider.PushLeft()
+											keyPathTabs.selected--
+										}
 									}
-									keyPathTabs.selected = tabIdx
-								}
-								var tabWidth int
-								return layout.Stack{Alignment: layout.S}.Layout(gtx,
-									layout.Stacked(func(gtx Gtx) Dim {
-										dims := material.Clickable(gtx, &t.Clickable, func(gtx Gtx) Dim {
-											txt := t.KeyPath.Path.String()
-											return layout.UniformInset(unit.Dp(12)).Layout(gtx,
-												material.H6(th, txt).Layout,
-											)
-										})
-										tabWidth = dims.Size.X
-										return dims
-									}),
-									layout.Stacked(func(gtx Gtx) Dim {
-										if keyPathTabs.selected != tabIdx {
-											return layout.Dimensions{}
+									return material.Clickable(gtx, &outputLeftBtn, func(gtx Gtx) Dim {
+										gtx.Constraints.Min.X = gtx.Dp(48)
+										gtx.Constraints.Min.Y = gtx.Dp(48)
+										ic, _ := widget.NewIcon(icons.HardwareKeyboardArrowLeft)
+										return ic.Layout(gtx, color.NRGBA{A: 255})
+									})
+								}),
+								layout.Flexed(1, func(gtx Gtx) Dim {
+									return keyPathTabs.List.Layout(gtx, len(keyPathTabs.tabs), func(gtx Gtx, tabIdx int) Dim {
+										t := &keyPathTabs.tabs[tabIdx]
+										if t.Clicked(gtx) {
+											if keyPathTabs.selected < tabIdx {
+												tabsSlider.PushLeft()
+											} else if keyPathTabs.selected > tabIdx {
+												tabsSlider.PushRight()
+											}
+											keyPathTabs.selected = tabIdx
 										}
-										tabHeight := gtx.Dp(unit.Dp(4))
-										tabRect := image.Rect(0, 0, tabWidth, tabHeight)
-										paint.FillShape(gtx.Ops, th.Palette.ContrastBg, clip.Rect(tabRect).Op())
-										return layout.Dimensions{
-											Size: image.Point{X: tabWidth, Y: tabHeight},
+										var tabWidth int
+										return layout.Stack{Alignment: layout.S}.Layout(gtx,
+											layout.Stacked(func(gtx Gtx) Dim {
+												dims := material.Clickable(gtx, &t.Clickable, func(gtx Gtx) Dim {
+													txt := t.KeyPath.Path.String()
+													return layout.UniformInset(unit.Dp(12)).Layout(gtx,
+														material.H6(th, txt).Layout,
+													)
+												})
+												tabWidth = dims.Size.X
+												return dims
+											}),
+											layout.Stacked(func(gtx Gtx) Dim {
+												if keyPathTabs.selected != tabIdx {
+													return Dim{}
+												}
+												tabHeight := gtx.Dp(unit.Dp(4))
+												tabRect := image.Rect(0, 0, tabWidth, tabHeight)
+												paint.FillShape(gtx.Ops, th.Palette.ContrastBg, clip.Rect(tabRect).Op())
+												return Dim{
+													Size: image.Point{X: tabWidth, Y: tabHeight},
+												}
+											}),
+										)
+									})
+								}),
+								Rigid(func(gtx Gtx) Dim {
+									if outputRightBtn.Clicked(gtx) {
+										if keyPathTabs.selected < len(keyPathTabs.tabs)-1 {
+											tabsSlider.PushRight()
+											keyPathTabs.selected++
 										}
-									}),
-								)
-							})
+									}
+									return material.Clickable(gtx, &outputRightBtn, func(gtx Gtx) Dim {
+										gtx.Constraints.Min.X = gtx.Dp(48)
+										gtx.Constraints.Min.Y = gtx.Dp(48)
+										ic, _ := widget.NewIcon(icons.HardwareKeyboardArrowRight)
+										return ic.Layout(gtx, color.NRGBA{A: 255})
+									})
+								}),
+							)
 						}),
-						Rigid(func(gtx Gtx) layout.Dimensions {
-							return tabsSlider.Layout(gtx, func(gtx Gtx) layout.Dimensions {
+						Rigid(func(gtx Gtx) Dim {
+							return tabsSlider.Layout(gtx, func(gtx Gtx) Dim {
 								isValid := keyPathTabs.selected < len(keyPathTabs.tabs) &&
 									len(keyPathTabs.tabs) != 0 &&
 									keyPathTabs.selected >= 0
 								if !isValid {
-									return layout.Dimensions{}
+									return Dim{}
 								}
 								keyPath := keyPathTabs.tabs[keyPathTabs.selected]
 								flex := layout.Flex{Axis: layout.Vertical}
 								return flex.Layout(gtx,
-									Rigid(func(gtx Gtx) layout.Dimensions {
+									Rigid(func(gtx Gtx) Dim {
 										return material.Label(th, 16, keyPath.Path.String()).Layout(gtx)
 									}),
-									Rigid(func(gtx Gtx) layout.Dimensions {
+									Rigid(func(gtx Gtx) Dim {
 										return material.Label(th, 16, keyPath.Key.String()).Layout(gtx)
 									}),
-									Rigid(func(gtx Gtx) layout.Dimensions {
+									Rigid(func(gtx Gtx) Dim {
 										publicKeyExtended := keyPath.Key.PublicKeyExtended()
 										return material.Label(th, 16, publicKeyExtended.String()).Layout(gtx)
 									}),
-									Rigid(func(gtx Gtx) layout.Dimensions {
+									Rigid(func(gtx Gtx) Dim {
 										return material.Label(th, 16, keyPath.Key.PrivateKeyHex()).Layout(gtx)
 									}),
-									Rigid(func(gtx Gtx) layout.Dimensions {
+									Rigid(func(gtx Gtx) Dim {
 										publicKeyExtended := keyPath.Key.PublicKeyExtended()
 										return material.Label(th, 16, publicKeyExtended.PublicKeyHex()).Layout(gtx)
 									}),
-									Rigid(func(gtx Gtx) layout.Dimensions {
+									Rigid(func(gtx Gtx) Dim {
 										return material.Label(th, 16, keyPath.AddrHex()).Layout(gtx)
 									}),
 								)
