@@ -304,8 +304,9 @@ func loop(w *app.Window) error {
 								Rigid(func(gtx Gtx) Dim {
 									if outputLeftBtn.Clicked(gtx) {
 										if keyPathTabs.selected > 0 {
-											tabsSlider.PushLeft()
+											tabsSlider.PushRight()
 											keyPathTabs.selected--
+											keyPathTabs.ScrollTo(keyPathTabs.selected)
 										}
 									}
 									return material.Clickable(gtx, &outputLeftBtn, func(gtx Gtx) Dim {
@@ -355,8 +356,9 @@ func loop(w *app.Window) error {
 								Rigid(func(gtx Gtx) Dim {
 									if outputRightBtn.Clicked(gtx) {
 										if keyPathTabs.selected < len(keyPathTabs.tabs)-1 {
-											tabsSlider.PushRight()
+											tabsSlider.PushLeft()
 											keyPathTabs.selected++
+											keyPathTabs.ScrollTo(keyPathTabs.selected)
 										}
 									}
 									return material.Clickable(gtx, &outputRightBtn, func(gtx Gtx) Dim {
