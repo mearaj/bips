@@ -224,6 +224,7 @@ func (key *Key) PublicKeyExtended() Key {
 	return pubKey
 }
 
+// PrivateKeyHex returns private key in hex string without prefix 0x
 func (key *Key) PrivateKeyHex() string {
 	if key.IsPrivate() {
 		return hex.EncodeToString(key[PvtKeyStartIndex:PvtKeyEndIndex])
@@ -231,6 +232,7 @@ func (key *Key) PrivateKeyHex() string {
 	return ""
 }
 
+// PublicKeyHex returns public key in hex string without prefix 0x
 func (key *Key) PublicKeyHex() string {
 	if key.IsPrivate() {
 		pubKey := key.PublicKeyExtended()

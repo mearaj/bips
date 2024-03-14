@@ -124,7 +124,7 @@ func testVectorKeyPairs(t *testing.T, vector testMasterKey) {
 	// Iterate over the entire child chain and test the given keys
 	for _, testChildKey := range vector.children {
 		// Get the private key at the given key tree path
-		privKey, err = privKey.NewChildKey(testChildKey.pathFragment)
+		*privKey, err = privKey.NewChildKey(testChildKey.pathFragment)
 		assert.NoError(t, err)
 
 		// Get this private key's public key
@@ -135,7 +135,7 @@ func testVectorKeyPairs(t *testing.T, vector testMasterKey) {
 		assert.Equal(t, testChildKey.pubKey, pubKey.String())
 
 		// Serialize and deserialize both keys and ensure they're the same
-		assertKeySerialization(t, privKey, testChildKey.privKey)
+		assertKeySerialization(t, *privKey, testChildKey.privKey)
 		assertKeySerialization(t, pubKey, testChildKey.pubKey)
 	}
 }
@@ -203,7 +203,7 @@ func TestB58SerializeUnserialize(t *testing.T) {
 	for _, test := range tests {
 		key, err := NewMasterKey(test.seed)
 		assert.NoError(t, err)
-		assertKeySerialization(t, key, test.base58)
+		assertKeySerialization(t, *key, test.base58)
 	}
 }
 
@@ -238,7 +238,7 @@ func TestCantCreateHardenedPublicChild(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test that it throws an error for public keys if hardened
-	key = key.PublicKeyExtended()
+	*key = key.PublicKeyExtended()
 
 	_, err = key.NewChildKey(FirstHardenedChild - 1)
 	assert.NoError(t, err)

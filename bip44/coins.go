@@ -5,7 +5,7 @@ import (
 )
 
 var RegBip44CoinsTypeToValMap = make(map[uint32]Coin)
-var RegBip44CoinsPathToValMap = make(map[uint32]Coin)
+var RegBip44CoinsPathCompToValMap = make(map[uint32]Coin)
 var RegBip44CoinsNameToValMap = make(map[string]Coin)
 
 // RegCoins https://github.com/satoshilabs/slips/issues/1682
@@ -1160,6 +1160,6 @@ func init() {
 		}
 		RegBip44CoinsTypeToValMap[RegCoins[i].Type] = RegCoins[i]
 		RegBip44CoinsNameToValMap[RegCoins[i].Name] = RegCoins[i]
-		RegBip44CoinsPathToValMap[RegCoins[i].PathComponent] = RegCoins[i]
+		RegBip44CoinsPathCompToValMap[RegCoins[i].PathComponent] = RegCoins[i]
 	}
 }

@@ -76,13 +76,6 @@ func RootKeyFromSeed(seed string) (*bip32.Key, error) {
 
 type Path = bip32.Path
 
-type KeyPathRange struct {
-	StartIndex uint32
-	EndIndex   uint32
-	KeyPath
-	KeyPaths []KeyPath
-}
-
 type Generator struct {
 	rootKey bip32.Key
 }
@@ -117,50 +110,20 @@ func (g *Generator) DeriveBIP32Result(p bip32.Path) ([]KeyPath, error) {
 	keyPaths := make([]KeyPath, 1)
 	keyPaths[0] = keyPath
 	currentKey := *rootKey
-	for _, val := range pathItems {
-		derivedPath = fmt.Sprintf("%s/%d", derivedPath, val%bip32.FirstHardenedChild)
-		if val >= bip32.FirstHardenedChild {
-			derivedPath += "'"
+	if len(pathItems) > 0 {
+		for _, val := range pathItems[1:] {
+			derivedPath = fmt.Sprintf("%s/%d", derivedPath, val%bip32.FirstHardenedChild)
+			if val >= bip32.FirstHardenedChild {
+				derivedPath += "'"
+			}
+			currentKey, _ = currentKey.NewChildKey(val)
+			keyPaths = append(keyPaths, KeyPath{
+				Path: Path(derivedPath).Formatted(),
+				Key:  currentKey,
+			})
 		}
-		currentKey, _ = currentKey.NewChildKey(val)
-		keyPaths = append(keyPaths, KeyPath{
-			Path: Path(derivedPath).Formatted(),
-			Key:  currentKey,
-		})
 	}
 	return keyPaths, nil
-}
-
-func (b *KeyPathRange) GenerateRange() error {
-	startIndex := b.StartIndex
-	endIndex := b.EndIndex
-
-	if endIndex-startIndex < 1 {
-		return ErrInvalidRangeProvided
-	}
-	if !b.Key.IsValid() {
-		return ErrInvalidRootKey
-	}
-	if !b.Path.IsValid() {
-		return ErrUnSupportedOrInvalidPath
-	}
-
-	currentKey := b.Key
-	derivedPath := b.Path.String()
-	keyPaths := make([]KeyPath, 0)
-	for i := startIndex; i < endIndex; i++ {
-		derivedPath = fmt.Sprintf("%s/%d", derivedPath, i%bip32.FirstHardenedChild)
-		if i >= bip32.FirstHardenedChild {
-			derivedPath += "'"
-		}
-		currentKey, _ = currentKey.NewChildKey(i)
-		keyPaths = append(keyPaths, KeyPath{
-			Path: Path(derivedPath).Formatted(),
-			Key:  currentKey,
-		})
-	}
-	b.KeyPaths = keyPaths
-	return nil
 }
 
 //AddressesKey difference between startIndex and endIndex range should

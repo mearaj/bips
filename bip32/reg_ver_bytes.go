@@ -20,8 +20,11 @@ var PvtFlagToHDBytesSlice = map[uint32][]VersionBytes{}
 // HDVersionBytesSlice Slice of All Registered VersionBytes
 var HDVersionBytesSlice []VersionBytes
 
-// PurposeToHDBytesSlice uint32 value is VersionBytes.PurposeVal and not VersionBytes.PurposeValFull
+// PurposeToHDBytesSlice uint32 value is VersionBytes.PurposeVal
 var PurposeToHDBytesSlice = map[uint32][]VersionBytes{}
+
+// PurposeFullToHDBytesSlice uint32 value is VersionBytes.PurposeValFull
+var PurposeFullToHDBytesSlice = map[uint32][]VersionBytes{}
 
 // CoinTypeToHDBytesSlice uint32 value is VersionBytes.CoinVal and not VersionBytes.CoinValFull
 var CoinTypeToHDBytesSlice = map[uint32][]VersionBytes{}
@@ -429,7 +432,9 @@ func init() {
 			val, _ = PubFlagToHDBytesSlice[hdBytes.PubKeyFlag]
 			PubFlagToHDBytesSlice[hdBytes.PubKeyFlag] = append(val, hdBytes)
 			purposeVal, _ := hdBytes.PurposeVal()
+			purposeFullVal, _ := hdBytes.PurposeValFull()
 			PurposeToHDBytesSlice[purposeVal] = append(PurposeToHDBytesSlice[purposeVal], hdBytes)
+			PurposeFullToHDBytesSlice[purposeFullVal] = append(PurposeFullToHDBytesSlice[purposeFullVal], hdBytes)
 			coinVal, _ := hdBytes.CoinVal()
 			CoinTypeToHDBytesSlice[coinVal] = append(CoinTypeToHDBytesSlice[coinVal], hdBytes)
 		}
