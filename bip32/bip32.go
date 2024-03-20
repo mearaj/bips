@@ -178,10 +178,10 @@ func (key *Key) getIntermediary(childIdx uint32) ([]byte, error) {
 	childIndexBytes := uint32Bytes(childIdx)
 	var data [33]byte
 	if childIdx >= FirstHardenedChild {
-		copy(data[1:], key[PvtKeyStartIndex:PubKeyEndIndex])
+		copy(data[1:], key[PvtKeyStartIndex:PvtKeyEndIndex])
 	} else {
 		if key.IsPrivate() {
-			copy(data[:], publicKeyForPrivateKey(key[PvtKeyStartIndex:PubKeyEndIndex]))
+			copy(data[:], publicKeyForPrivateKey(key[PvtKeyStartIndex:PvtKeyEndIndex]))
 		} else {
 			copy(data[:], key[PubKeyStartIndex:])
 		}
@@ -203,15 +203,15 @@ func (key *Key) PublicKeyExtended() Key {
 	vs := Version(key[VersionStartIndex:VersionEndIndex])
 	vsVal := binary.BigEndian.Uint32(vs[:])
 	hdBsArr, ok := PvtFlagToHDBytesSlice[vsVal]
-	var pubKey Key
-	copy(pubKey[:], key[:])
+	var extendedPubKey Key
+	copy(extendedPubKey[:], key[:])
 	if key.IsPrivate() {
 		if !ok || len(hdBsArr) == 0 {
 			vs = DefaultMainnetVersion.PubKeyFlagBytes()
 		} else {
 			vs = hdBsArr[0].PubKeyFlagBytes()
 		}
-		copy(pubKey[PubKeyStartIndex:PubKeyEndIndex],
+		copy(extendedPubKey[PubKeyStartIndex:PubKeyEndIndex],
 			publicKeyForPrivateKey(key[PvtKeyStartIndex:]),
 		)
 	} else {
@@ -220,8 +220,8 @@ func (key *Key) PublicKeyExtended() Key {
 			vs = DefaultMainnetVersion.PubKeyFlagBytes()
 		}
 	}
-	pubKey.SetVersion(vs)
-	return pubKey
+	extendedPubKey.SetVersion(vs)
+	return extendedPubKey
 }
 
 // PrivateKeyHex returns private key in hex string without prefix 0x

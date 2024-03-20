@@ -73,22 +73,22 @@ type KeyPathRange struct {
 	KeyPaths []KeyPath
 }
 
-func (b *KeyPathRange) GenerateRange() error {
-	startIndex := b.StartIndex
-	endIndex := b.EndIndex
+func (k *KeyPathRange) GenerateRange() error {
+	startIndex := k.StartIndex
+	endIndex := k.EndIndex
 
 	if endIndex-startIndex < 1 {
 		return ErrInvalidRangeProvided
 	}
-	if !b.Key.IsValid() {
+	if !k.Key.IsValid() {
 		return ErrInvalidRootKey
 	}
-	if !b.Path.IsValid() {
+	if !k.Path.IsValid() {
 		return ErrUnSupportedOrInvalidPath
 	}
 
-	currentKey := b.Key
-	derivedPath := b.Path.String()
+	currentKey := k.Key
+	derivedPath := k.Path.String()
 	keyPaths := make([]KeyPath, 0)
 	for i := startIndex; i < endIndex; i++ {
 		derivedPath = fmt.Sprintf("%s/%d", derivedPath, i%bip32.FirstHardenedChild)
@@ -101,6 +101,6 @@ func (b *KeyPathRange) GenerateRange() error {
 			Key:  currentKey,
 		})
 	}
-	b.KeyPaths = keyPaths
+	k.KeyPaths = keyPaths
 	return nil
 }
